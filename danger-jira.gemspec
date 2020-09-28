@@ -38,6 +38,9 @@ Gem::Specification.new do |spec|
   # If you want to work on older builds of ruby
   spec.add_development_dependency 'listen', '3.0.7'
 
+  # httpparty
+  spec.add_development_dependency 'httparty'
+
   # This gives you the chance to run a REPL inside your tests
   # via:
   #

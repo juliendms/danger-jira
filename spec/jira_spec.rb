@@ -64,6 +64,14 @@ module Danger
         issues = @jira.find_jira_issues(key: "WEB")
         expect(issues).to eq(["WEB-123"])
       end
+
+      it "can retrieve the summary of an issue from a public JIRA" do
+        href = "https://issues.apache.org/jira/"
+        issue = "HBASE-1"
+        expected_output = "<a href='#{href}browse/#{issue}'>#{issue} - rest server port should be configurable by hbase-site.xml</a>"
+        result = @jira.link(href: href, issue: issue, include_summary: true)
+        expect(result).to eq(expected_output)
+      end
     end
   end
 end

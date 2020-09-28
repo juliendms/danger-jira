@@ -1,3 +1,6 @@
+require "httparty"
+require "json"
+
 module Danger
   # Links JIRA issues to a pull request.
   #
@@ -13,9 +16,6 @@ module Danger
     #
     # @param [Array] key
     #         An array of JIRA project keys KEY-123, JIRA-125 etc.
-    #
-    # @param [String] url
-    #         The JIRA url hosted instance.
     #
     # @param [String] emoji
     #         The emoji you want to display in the message.
@@ -35,11 +35,14 @@ module Danger
     # @param [Boolean] skippable
     #         Option to skip the report if 'no-jira' is provided on the PR title, description or commits
     #
+    # @param [Boolean] include_summary
+    #         Option to retrieve the summary of the issue. May required DANGER_JIRA_API_TOKEN environment variable
+    #
     # @return [void]
     #
-    def check(key: nil, url: nil, emoji: ":link:", search_title: true, search_commits: false, fail_on_warning: false, report_missing: true, skippable: true)
+    def check(key: nil, emoji: ":link:", search_title: true, search_commits: false, fail_on_warning: false, report_missing: true, skippable: true, include_summary: false)
       throw Error("'key' missing - must supply JIRA issue key") if key.nil?
-      throw Error("'url' missing - must supply JIRA installation URL") if url.nil?
+      throw Error("The environment variable 'DANGER_JIRA_URL' is not set - must supply JIRA url") if ENV["DANGER_JIRA_URL"].nil?
 
       return if skippable && should_skip_jira?(search_title: search_title)
 
@@ -50,7 +53,7 @@ module Danger
       )
 
       if !jira_issues.empty?
-        jira_urls = jira_issues.map { |issue| link(href: ensure_url_ends_with_slash(url), issue: issue) }.join(", ")
+        jira_urls = jira_issues.map { |issue| link(href: ensure_url_ends_with_slash(ENV["DANGER_JIRA_URL"]), issue: issue, include_summary: include_summary) }.join(", ")
         message("#{emoji} #{jira_urls}")
       elsif report_missing
         msg = "This PR does not contain any JIRA issue keys in the PR title or commit messages (e.g. KEY-123)"
@@ -121,8 +124,28 @@ module Danger
       return url
     end
 
-    def link(href: nil, issue: nil)
-      return "<a href='#{href}#{issue}'>#{issue}</a>"
+    def link(href: nil, issue: nil, include_summary: false)
+      if include_summary
+        api_endpoint = href + "rest/api/2/issue/#{issue}?fields=summary"
+        headers = nil
+
+        unless ENV["DANGER_JIRA_API_TOKEN"].nil?
+          headers = {
+            Authorization: "Basic #{ENV['DANGER_JIRA_API_TOKEN']}"
+          }
+        end
+
+        response = HTTParty.get(api_endpoint, headers)
+
+        if response.code == 200
+          summary = JSON.parse(response.body).dig("fields", "summary")
+          return "<a href='#{href}browse/#{issue}'>#{issue} - #{summary}</a>"
+        else
+          message("Danger could not retrieve the summary of the issue #{issue}, check DANGER_JIRA_API_TOKEN and DANGER_JIRA_URL environment variables. Error code: #{response.code}.")
+        end
+      end
+
+      return "<a href='#{href}browse/#{issue}'>#{issue}</a>"
     end
   end
 end

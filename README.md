@@ -15,16 +15,24 @@ gem 'danger-jira'
 
 ## Usage
 
+You first need to define the environment variable `DANGER_JIRA_URL` in your CI environment, for example:
+
+```
+DANGER_JIRA_URL: https://myjira.atlassian.net
+```
+
+You can then run this plugin by calling:
+
 ```ruby
 // Dangerfile
 jira.check(
   key: ["KEY", "PM"],
-  url: "https://myjira.atlassian.net/browse",
   search_title: true,
   search_commits: false,
   fail_on_warning: false,
   report_missing: true,
-  skippable: true
+  skippable: true,
+  include_summary: false
 )
 ```
 
@@ -39,7 +47,7 @@ With "KEY-123" in the PR title or PR body, Danger will comment with:
   </thead>
   <tbody><tr>
       <td>:book:</td>
-      <td>:paperclip: <a href="https://myjira.atlassian.net/browse/KEY-123">KEY-123</a></td>
+      <td>:paperclip: <a href="https://myjira.atlassian.net/browse/KEY-123">KEY-123 - Issue summary</a></td>
     </tr>
   </tbody>
 </table>
@@ -52,6 +60,18 @@ With "KEY-123" in the PR title or PR body, Danger will comment with:
 ## Skipping
 
 You can skip danger checking for a JIRA issue by having `[no-jira]` in your title or PR body.
+
+## Summary of the issue
+
+Optionnaly, the plugin can try to retrieve the summary of the issue(s) with the parameter `include_summary: true`.
+
+If the issues of the project are public (like [this one](https://issues.apache.org/jira/browse/HBASE-1)), you should not need any token to retrieve the summary. Otherwise it is required to set the environment variable `DANGER_JIRA_API_TOKEN` in your CI environment so that danger can log in and query the issues.
+
+To generate a token from a JIRA Cloud instance, you can follow [this tutorial](https://confluence.atlassian.com/cloud/api-tokens-938839638.html).
+
+If you are targeting a JIRA Server instance, check [this link](https://developer.atlassian.com/server/jira/platform/basic-authentication/#construct-the-authorization-header) instead. The environment variable should contain the Base64 encoded string `username:password`.
+
+> In any case, if the summary cannot be retrieved, danger will still include the issue key with the correct link (just like with `include_summary: false`). Additionnaly, danger will post a message with the error code of the request to retrieve the summary.
 
 ## License
 
