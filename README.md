@@ -32,7 +32,7 @@ jira.check(
   fail_on_warning: false,
   report_missing: true,
   skippable: true,
-  include_summary: false
+  include_summary: true
 )
 ```
 
