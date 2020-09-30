@@ -26,6 +26,7 @@ Gem::Specification.new do |spec|
 
   # Testing support
   spec.add_development_dependency 'rspec', '~> 3.4'
+  spec.add_development_dependency 'webmock'
 
   # Linting code and docs
   spec.add_development_dependency "rubocop", "~> 0.48.1"
@@ -38,8 +39,8 @@ Gem::Specification.new do |spec|
   # If you want to work on older builds of ruby
   spec.add_development_dependency 'listen', '3.0.7'
 
-  # httpparty
-  spec.add_development_dependency 'httparty'
+  # HTTP
+  spec.add_development_dependency 'http'
 
   # This gives you the chance to run a REPL inside your tests
   # via:

@@ -7,6 +7,7 @@ require "bundler/setup"
 require "pry"
 
 require "rspec"
+require "webmock/rspec"
 require "danger"
 
 if `git remote -v` == ""

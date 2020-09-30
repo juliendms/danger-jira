@@ -1,5 +1,4 @@
-require "httparty"
-require "json"
+require "http"
 
 module Danger
   # Links JIRA issues to a pull request.
@@ -38,9 +37,22 @@ module Danger
     # @param [Boolean] include_summary
     #         Option to retrieve the summary of the issue. May required DANGER_JIRA_API_TOKEN environment variable
     #
+    # @param [Integer] transition_id
+    #         If this parameter is set, the plugin will try to transition each JIRA issue. May required DANGER_JIRA_API_TOKEN environment variable
+    #
     # @return [void]
     #
-    def check(key: nil, emoji: ":link:", search_title: true, search_commits: false, fail_on_warning: false, report_missing: true, skippable: true, include_summary: false)
+    def check(
+      key: nil,
+      emoji: ":link:",
+      search_title: true,
+      search_commits: false,
+      fail_on_warning: false,
+      report_missing: true,
+      skippable: true,
+      include_summary: false,
+      transition_id: nil
+    )
       throw Error("'key' missing - must supply JIRA issue key") if key.nil?
       throw Error("The environment variable 'DANGER_JIRA_URL' is not set - must supply JIRA url") if ENV["DANGER_JIRA_URL"].nil?
 
@@ -53,8 +65,11 @@ module Danger
       )
 
       if !jira_issues.empty?
-        jira_urls = jira_issues.map { |issue| link(href: ensure_url_ends_with_slash(ENV["DANGER_JIRA_URL"]), issue: issue, include_summary: include_summary) }.join(", ")
+        href = ensure_url_ends_with_slash(ENV["DANGER_JIRA_URL"])
+        headers = headers
+        jira_urls = jira_issues.map { |issue| link(href: href, issue: issue, include_summary: include_summary, headers: headers) }.join(", ")
         message("#{emoji} #{jira_urls}")
+        transition(href: href, jira_issues: jira_issues, transition_id: transition_id, headers: headers)
       elsif report_missing
         msg = "This PR does not contain any JIRA issue keys in the PR title or commit messages (e.g. KEY-123)"
         if fail_on_warning
@@ -124,21 +139,13 @@ module Danger
       return url
     end
 
-    def link(href: nil, issue: nil, include_summary: false)
+    def link(issue: nil, include_summary: false)
       if include_summary
-        api_endpoint = href + "rest/api/2/issue/#{issue}?fields=summary"
-        headers = nil
+        api_endpoint = "#{href}rest/api/2/issue/#{issue}?fields=summary"
+        response = HTTP.headers(headers).get(api_endpoint)
 
-        unless ENV["DANGER_JIRA_API_TOKEN"].nil?
-          headers = {
-            Authorization: "Basic #{ENV['DANGER_JIRA_API_TOKEN']}"
-          }
-        end
-
-        response = HTTParty.get(api_endpoint, headers)
-
-        if response.code == 200
-          summary = JSON.parse(response.body).dig("fields", "summary")
+        if response.status.success?
+          summary = response.parse.dig("fields", "summary")
           return "<a href='#{href}browse/#{issue}'>#{issue} - #{summary}</a>"
         else
           message("Danger could not retrieve the summary of the issue #{issue}, check DANGER_JIRA_API_TOKEN and DANGER_JIRA_URL environment variables. Error code: #{response.code}.")
@@ -146,6 +153,39 @@ module Danger
       end
 
       return "<a href='#{href}browse/#{issue}'>#{issue}</a>"
+    end
+
+    def transition(jira_issues: nil, transition_id: nil)
+      unless transition_id.nil?
+        data = {
+          transition: {
+            id: transition_id.to_s
+          }
+        }
+
+        jira_issues.each do |issue|
+          api_endpoint = "#{href}rest/api/2/issue/#{issue}/transitions"
+          response = HTTP.headers(headers).post(api_endpoint, json: data)
+          unless response.status.success?
+            warn("Danger could not transition the issue #{issue}, please do it manually. Error code: #{response.code}.")
+          end
+        end
+      end
+    end
+
+    def headers
+      if @headers.nil?
+        @headers = {
+          "Content-Type" => "application/json",
+          "Accept" => "application/json"
+        }
+        @headers["Authorization"] = "Basic #{ENV['DANGER_JIRA_API_TOKEN']}" unless ENV["DANGER_JIRA_API_TOKEN"].nil?
+      end
+      return @headers
+    end
+
+    def href
+      @href ||= ensure_url_ends_with_slash(ENV["DANGER_JIRA_URL"])
     end
   end
 end
